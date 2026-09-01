@@ -13,6 +13,16 @@ consumibles.
 
 Productor sintético → Kafka → Apache Beam → Kafka → Consumidor
 
+## Infraestructura Kafka
+
+El proyecto utiliza Apache Kafka 4.3.1 ejecutado localmente mediante
+Docker Compose en modo KRaft con un único nodo.
+
+### Iniciar Kafka
+
+```bash
+docker compose up -d
+
 ## Estado
 
 Proyecto en desarrollo.
