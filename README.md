@@ -22,6 +22,48 @@ Docker Compose en modo KRaft con un único nodo.
 
 ```bash
 docker compose up -d
+```
+
+## Contrato de eventos
+
+Los eventos de telemetría utilizan JSON y actualmente corresponden a
+`schema_version = 1`.
+
+Ejemplo:
+
+```json
+{
+  "schema_version": 1,
+  "event_id": "NODE-01-20260901T183405-001",
+  "key": "NODE-01",
+  "event_time": "2026-09-01T18:34:05Z",
+  "emitted_at": "2026-09-01T18:34:06Z",
+  "payload": {
+    "node_id": "NODE-01",
+    "latency_ms": 32.5,
+    "packet_loss_pct": 0.7,
+    "throughput_mbps": 92.4
+  }
+}
+```
+
+### Campos
+
+- `event_id`: identidad estable del evento y futura base para deduplicación.
+- `key`: clave de negocio y particionamiento Kafka; coincide con `node_id`.
+- `event_time`: momento UTC en que ocurrió la medición.
+- `emitted_at`: momento UTC en que el productor publicó el evento.
+- `schema_version`: versión del contrato.
+- `payload`: mediciones del nodo.
+
+### Reglas de validación
+
+- Los timestamps deben expresarse en UTC y terminar en `Z`.
+- `latency_ms` debe ser mayor o igual a cero.
+- `packet_loss_pct` debe encontrarse entre 0 y 100.
+- `throughput_mbps` debe ser mayor o igual a cero.
+- `key` debe coincidir con `payload.node_id`.
+
 
 ## Estado
 
