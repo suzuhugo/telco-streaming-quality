@@ -65,6 +65,53 @@ Ejemplo:
 - `key` debe coincidir con `payload.node_id`.
 
 
+## Productor sintético
+
+El productor genera telemetría reproducible para tres nodos:
+
+- `NODE-01`
+- `NODE-02`
+- `NODE-03`
+
+Las métricas generadas son latencia, pérdida de paquetes y throughput.
+
+### Ejecución normal
+
+```bash
+uv run python -m app.producer --events 12 --rate 2
+```
+
+### Generación reproducible
+
+```bash
+uv run python -m app.producer --events 12 --rate 2 --seed 42
+```
+
+### Simular duplicados
+
+```bash
+uv run python -m app.producer --events 12 --rate 2 --duplicate-rate 0.20
+```
+
+### Simular eventos fuera de orden
+
+```bash
+uv run python -m app.producer --events 12 --rate 2 --out-of-order-rate 0.20
+```
+
+### Ejecución sin Kafka
+
+```bash
+uv run python -m app.producer --events 6 --dry-run
+```
+
+El productor utiliza `node_id` como clave Kafka y publica en
+`telco.telemetry.v1`.
+
+Los duplicados deliberados conservan el mismo `event_id`. El desorden se
+simula alterando el orden de publicación sin modificar el `event_time`.
+
+
 ## Estado
 
 Proyecto en desarrollo.
