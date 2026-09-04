@@ -2,8 +2,9 @@ from typing import Any
 
 import apache_beam as beam
 from apache_beam import pvalue
+from apache_beam.transforms import window
 
-from app.contracts import deserialize_event
+from app.contracts import deserialize_event, parse_utc
 
 INVALID_TAG = "invalid"
 
@@ -77,3 +78,47 @@ class ParseAndValidateDoFn(beam.DoFn):
             return
 
         yield event
+
+
+class AssignEventTimestampDoFn(beam.DoFn):
+    """Asignar al elemento el event_time declarado por el dominio."""
+
+    def process(self, event):
+        event_datetime = parse_utc(event["event_time"])
+
+        yield beam.window.TimestampedValue(
+            event,
+            event_datetime.timestamp(),
+        )
+
+
+def fixed_window_policy(
+    *,
+    window_seconds: int = 60,
+    allowed_lateness_seconds: int = 30,
+) -> beam.WindowInto:
+    """Crear la política temporal base del proyecto."""
+
+    return beam.WindowInto(
+        window.FixedWindows(window_seconds),
+        allowed_lateness=allowed_lateness_seconds,
+    )
+
+
+class AddWindowMetadataDoFn(beam.DoFn):
+    """Agregar metadatos de ventana para observación y pruebas."""
+
+    def process(
+        self,
+        event,
+        window_param=beam.DoFn.WindowParam,
+    ):
+        yield {
+            **event,
+            "window_start": window_param.start.to_utc_datetime(
+                has_tz=True
+            ).isoformat(),
+            "window_end": window_param.end.to_utc_datetime(
+                has_tz=True
+            ).isoformat(),
+        }

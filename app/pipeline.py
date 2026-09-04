@@ -10,7 +10,13 @@ from apache_beam.options.pipeline_options import (
     StandardOptions,
 )
 
-from app.transforms import INVALID_TAG, ParseAndValidateDoFn
+from app.transforms import (
+    INVALID_TAG,
+    AddWindowMetadataDoFn,
+    AssignEventTimestampDoFn,
+    ParseAndValidateDoFn,
+    fixed_window_policy,
+)
 
 DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092"
 DEFAULT_INPUT_TOPIC = "telco.telemetry.v1"
@@ -21,14 +27,19 @@ LOGGER = logging.getLogger(__name__)
 
 def log_valid_event(event: dict[str, Any]) -> dict[str, Any]:
     LOGGER.info(
-        "VALID event_id=%s key=%s event_time=%s",
+        "VALID "
+        "event_id=%s "
+        "key=%s "
+        "event_time=%s "
+        "window=[%s,%s)",
         event["event_id"],
         event["key"],
         event["event_time"],
+        event["window_start"],
+        event["window_end"],
     )
 
     return event
-
 
 def log_invalid_event(record: dict[str, Any]) -> dict[str, Any]:
     LOGGER.warning(
@@ -49,7 +60,7 @@ def build_pipeline(
     group_id: str,
     offset_reset: str,
 ):
-    """Construir la fase de lectura y validación."""
+    """Construir la lectura, validación y política temporal."""
 
     kafka_messages = (
         pipeline
@@ -77,8 +88,25 @@ def build_pipeline(
         )
     )
 
-    _ = (
+    windowed_valid = (
         outputs.valid
+        | "AssignEventTime"
+        >> beam.ParDo(AssignEventTimestampDoFn())
+        | "FixedWindows60s"
+        >> fixed_window_policy(
+            window_seconds=60,
+            allowed_lateness_seconds=30,
+        )
+    )
+
+    observable_valid = (
+        windowed_valid
+        | "AddWindowMetadata"
+        >> beam.ParDo(AddWindowMetadataDoFn())
+    )
+
+    _ = (
+        observable_valid
         | "LogValidEvents"
         >> beam.Map(log_valid_event)
     )
@@ -89,7 +117,7 @@ def build_pipeline(
         >> beam.Map(log_invalid_event)
     )
 
-    return outputs.valid, outputs.invalid
+    return windowed_valid, outputs.invalid
 
 
 def parse_args():

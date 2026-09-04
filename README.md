@@ -112,6 +112,100 @@ Los duplicados deliberados conservan el mismo `event_id`. El desorden se
 simula alterando el orden de publicación sin modificar el `event_time`.
 
 
+## Pipeline Beam
+
+El pipeline consume los eventos desde `telco.telemetry.v1` mediante
+Apache Beam KafkaIO.
+
+En esta etapa se realizan:
+
+- lectura desde Kafka;
+- deserialización JSON;
+- validación del contrato;
+- validación de consistencia entre Kafka key y `event.key`;
+- separación lógica entre eventos válidos e inválidos.
+
+Los eventos inválidos se registran en logs y no detienen el pipeline.
+
+### Ejecutar el pipeline
+
+```bash
+uv run python -m app.pipeline \
+  --group-id telco-quality-pipeline-v1 \
+  --offset-reset latest
+```
+
+El pipeline utiliza `DirectRunner` en modo streaming.
+
+### Producir eventos
+
+En otra terminal:
+
+```bash
+uv run python -m app.producer --events 12 --rate 2 --seed 42
+```
+
+### Replay
+
+Para volver a procesar el historial se puede utilizar un consumer group
+nuevo con `earliest`:
+
+```bash
+uv run python -m app.pipeline \
+  --group-id telco-quality-replay-1 \
+  --offset-reset earliest
+```
+
+En esta fase el campo `event_time` se valida, pero todavía no se utiliza
+como timestamp Beam. La asignación explícita de tiempo de evento se
+realiza en la siguiente etapa del pipeline.
+
+## Tiempo de evento y ventanas
+
+El pipeline utiliza `event_time` como timestamp lógico de cada medición.
+
+`event_time` representa cuándo ocurrió la medición en el dominio de red,
+mientras que `emitted_at` representa cuándo fue publicada por el productor.
+
+### Ventana
+
+Se utiliza una ventana fija de 60 segundos:
+
+```text
+[start, end)
+```
+
+Por ejemplo, un evento con:
+
+```text
+event_time = 2026-09-03T18:34:25Z
+```
+
+pertenece a:
+
+```text
+[2026-09-03T18:34:00Z, 2026-09-03T18:35:00Z)
+```
+
+La asignación se realiza mediante el `event_time` y no mediante el orden
+de llegada a Kafka.
+
+### Desorden
+
+El productor puede alterar el orden de publicación sin modificar
+`event_time`, permitiendo demostrar que eventos fuera de orden continúan
+asignándose a la ventana temporal correcta.
+
+### Lateness
+
+La política de ventana declara inicialmente:
+
+- ventana fija: 60 segundos;
+- allowed lateness: 30 segundos.
+
+La semántica completa de eventos tardíos, triggers y panes se demostrará
+junto con la agregación incremental.
+
 ## Estado
 
 Proyecto en desarrollo.
