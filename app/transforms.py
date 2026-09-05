@@ -2,9 +2,11 @@ from typing import Any
 
 import apache_beam as beam
 from apache_beam import pvalue
-from apache_beam.transforms import window
+from apache_beam.transforms import trigger, window
 
 from app.contracts import deserialize_event, parse_utc
+
+from apache_beam.utils.windowed_value import PaneInfoTiming
 
 INVALID_TAG = "invalid"
 
@@ -261,6 +263,7 @@ class FormatQualityAggregateDoFn(beam.DoFn):
         self,
         element,
         window_param=beam.DoFn.WindowParam,
+        pane_info=beam.DoFn.PaneInfoParam,
     ):
         node_id, metrics = element
 
@@ -278,7 +281,26 @@ class FormatQualityAggregateDoFn(beam.DoFn):
                 .to_utc_datetime(has_tz=True)
                 .isoformat()
             ),
+            "pane_index": pane_info.index,
+            "pane_timing": PaneInfoTiming.to_string(
+                pane_info.timing
+            ),
             **metrics,
         }
 
 
+def aggregation_window_policy(
+    *,
+    window_seconds: int = 60,
+    allowed_lateness_seconds: int = 30,
+) -> beam.WindowInto:
+    """Configurar triggers y acumulación para los agregados."""
+
+    return beam.WindowInto(
+        window.FixedWindows(window_seconds),
+        trigger=trigger.AfterWatermark(
+            late=trigger.AfterCount(1),
+        ),
+        allowed_lateness=allowed_lateness_seconds,
+        accumulation_mode=trigger.AccumulationMode.ACCUMULATING,
+    )

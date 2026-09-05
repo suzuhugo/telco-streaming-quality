@@ -18,7 +18,9 @@ from app.transforms import (
     aggregate_quality_by_node,
     deduplicate_by_event_id,
     fixed_window_policy,
+    aggregation_window_policy,
 )
+
 
 DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092"
 DEFAULT_INPUT_TOPIC = "telco.telemetry.v1"
@@ -105,8 +107,17 @@ def build_pipeline(
         windowed_valid
     )
 
-    aggregated_quality = aggregate_quality_by_node(
+    aggregation_ready = (
         deduplicated_valid
+        | "AggregationTriggerPolicy"
+        >> aggregation_window_policy(
+            window_seconds=60,
+            allowed_lateness_seconds=30,
+        )
+    )
+
+    aggregated_quality = aggregate_quality_by_node(
+        aggregation_ready
     )
 
     formatted_quality = (
@@ -169,6 +180,8 @@ def log_quality_aggregate(
         "AGGREGATE "
         "node=%s "
         "window=[%s,%s) "
+        "pane=%s "
+        "pane_index=%s "
         "samples=%s "
         "avg_latency_ms=%s "
         "avg_packet_loss_pct=%s "
@@ -176,6 +189,8 @@ def log_quality_aggregate(
         result["node_id"],
         result["window_start"],
         result["window_end"],
+        result["pane_timing"],
+        result["pane_index"],
         result["sample_count"],
         result["avg_latency_ms"],
         result["avg_packet_loss_pct"],
@@ -184,6 +199,7 @@ def log_quality_aggregate(
 
     return result
 
+    
 
 def main() -> None:
     args, beam_args = parse_args()
