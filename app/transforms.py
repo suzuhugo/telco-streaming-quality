@@ -122,3 +122,31 @@ class AddWindowMetadataDoFn(beam.DoFn):
                 has_tz=True
             ).isoformat(),
         }
+
+
+def key_by_event_id(event):
+    """Usar event_id como clave temporal de deduplicación."""
+
+    return event["event_id"], event
+
+
+def keep_one_event(element):
+    """Conservar una copia de un grupo de eventos duplicados."""
+
+    _, events = element
+
+    return next(iter(events))
+
+
+def deduplicate_by_event_id(events):
+    """Eliminar duplicados por event_id dentro de cada ventana."""
+
+    return (
+        events
+        | "KeyByEventId"
+        >> beam.Map(key_by_event_id)
+        | "GroupByEventId"
+        >> beam.GroupByKey()
+        | "KeepOneEvent"
+        >> beam.Map(keep_one_event)
+    )

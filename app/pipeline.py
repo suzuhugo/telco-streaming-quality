@@ -15,6 +15,7 @@ from app.transforms import (
     AddWindowMetadataDoFn,
     AssignEventTimestampDoFn,
     ParseAndValidateDoFn,
+    deduplicate_by_event_id,
     fixed_window_policy,
 )
 
@@ -27,7 +28,7 @@ LOGGER = logging.getLogger(__name__)
 
 def log_valid_event(event: dict[str, Any]) -> dict[str, Any]:
     LOGGER.info(
-        "VALID "
+        "UNIQUE "
         "event_id=%s "
         "key=%s "
         "event_time=%s "
@@ -99,8 +100,12 @@ def build_pipeline(
         )
     )
 
-    observable_valid = (
+    deduplicated_valid = deduplicate_by_event_id(
         windowed_valid
+    )
+
+    observable_valid = (
+        deduplicated_valid
         | "AddWindowMetadata"
         >> beam.ParDo(AddWindowMetadataDoFn())
     )
@@ -117,7 +122,7 @@ def build_pipeline(
         >> beam.Map(log_invalid_event)
     )
 
-    return windowed_valid, outputs.invalid
+    return deduplicated_valid, outputs.invalid
 
 
 def parse_args():

@@ -206,6 +206,52 @@ La política de ventana declara inicialmente:
 La semántica completa de eventos tardíos, triggers y panes se demostrará
 junto con la agregación incremental.
 
+
+## Deduplicación
+
+Los eventos se deduplican mediante `event_id` después de asignar
+`event_time` y la ventana temporal.
+
+Dentro de cada ventana, el pipeline:
+
+```text
+evento
+  ↓
+(event_id, evento)
+  ↓
+GroupByKey
+  ↓
+conserva una copia
+```
+
+El horizonte de deduplicación queda acotado por la ventana y su política
+de lateness.
+
+Los duplicados deliberados producidos para las pruebas conservan el mismo
+`event_id`, `event_time` y `payload`, por lo que representan reintentos del
+mismo hecho.
+
+### Demostración
+
+```bash
+uv run python -m app.producer \
+  --events 6 \
+  --rate 2 \
+  --seed 42 \
+  --duplicate-rate 1.0
+```
+
+En este ejemplo se generan 6 hechos base pero se publican 12 mensajes.
+La salida lógica del pipeline contiene únicamente los 6 `event_id`
+distintos.
+
+### Limitación
+
+Se asume que un `event_id` identifica de forma estable un único hecho. Dos
+payloads diferentes con el mismo `event_id` se consideran una violación
+del contrato de origen.
+
+
 ## Estado
 
 Proyecto en desarrollo.
