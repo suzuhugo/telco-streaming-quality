@@ -12,9 +12,10 @@ from apache_beam.options.pipeline_options import (
 
 from app.transforms import (
     INVALID_TAG,
-    AddWindowMetadataDoFn,
     AssignEventTimestampDoFn,
+    FormatQualityAggregateDoFn,
     ParseAndValidateDoFn,
+    aggregate_quality_by_node,
     deduplicate_by_event_id,
     fixed_window_policy,
 )
@@ -104,16 +105,20 @@ def build_pipeline(
         windowed_valid
     )
 
-    observable_valid = (
+    aggregated_quality = aggregate_quality_by_node(
         deduplicated_valid
-        | "AddWindowMetadata"
-        >> beam.ParDo(AddWindowMetadataDoFn())
+    )
+
+    formatted_quality = (
+        aggregated_quality
+        | "FormatQualityAggregate"
+        >> beam.ParDo(FormatQualityAggregateDoFn())
     )
 
     _ = (
-        observable_valid
-        | "LogValidEvents"
-        >> beam.Map(log_valid_event)
+        formatted_quality
+        | "LogQualityAggregates"
+        >> beam.Map(log_quality_aggregate)
     )
 
     _ = (
@@ -122,7 +127,7 @@ def build_pipeline(
         >> beam.Map(log_invalid_event)
     )
 
-    return deduplicated_valid, outputs.invalid
+    return formatted_quality, outputs.invalid
 
 
 def parse_args():
@@ -155,6 +160,29 @@ def parse_args():
     )
 
     return parser.parse_known_args()
+
+
+def log_quality_aggregate(
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    LOGGER.info(
+        "AGGREGATE "
+        "node=%s "
+        "window=[%s,%s) "
+        "samples=%s "
+        "avg_latency_ms=%s "
+        "avg_packet_loss_pct=%s "
+        "avg_throughput_mbps=%s",
+        result["node_id"],
+        result["window_start"],
+        result["window_end"],
+        result["sample_count"],
+        result["avg_latency_ms"],
+        result["avg_packet_loss_pct"],
+        result["avg_throughput_mbps"],
+    )
+
+    return result
 
 
 def main() -> None:

@@ -252,6 +252,50 @@ payloads diferentes con el mismo `event_id` se consideran una violación
 del contrato de origen.
 
 
+## Agregación de calidad de red
+
+Después de validar, asignar tiempo de evento, aplicar ventanas y eliminar
+duplicados, el pipeline agrega las mediciones por `node_id`.
+
+La agregación utiliza `CombinePerKey` con un `CombineFn` incremental.
+
+### Métricas
+
+Para cada nodo y ventana se calculan:
+
+- `sample_count`
+- `avg_latency_ms`
+- `avg_packet_loss_pct`
+- `avg_throughput_mbps`
+
+Ejemplo de salida:
+
+```json
+{
+  "schema_version": 1,
+  "metric_type": "network_quality",
+  "node_id": "NODE-01",
+  "window_start": "2026-09-05T16:00:00+00:00",
+  "window_end": "2026-09-05T16:01:00+00:00",
+  "sample_count": 4,
+  "avg_latency_ms": 34.25,
+  "avg_packet_loss_pct": 0.82,
+  "avg_throughput_mbps": 91.60
+}
+```
+
+`CombineFn` mantiene acumuladores parciales de cantidad y sumas y permite
+que Beam combine resultados parciales sin materializar todas las mediciones
+de una clave.
+
+Los duplicados son eliminados antes de la agregación, por lo que un retry
+con el mismo `event_id` no incrementa `sample_count` ni modifica los
+promedios.
+
+
+
+
+
 ## Estado
 
 Proyecto en desarrollo.

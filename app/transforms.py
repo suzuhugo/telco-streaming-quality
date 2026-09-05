@@ -150,3 +150,135 @@ def deduplicate_by_event_id(events):
         | "KeepOneEvent"
         >> beam.Map(keep_one_event)
     )
+
+
+class NetworkQualityCombineFn(beam.CombineFn):
+    """Calcular métricas agregadas de calidad de red."""
+
+    def create_accumulator(self):
+        return (0, 0.0, 0.0, 0.0)
+
+    def add_input(self, accumulator, event):
+        (
+            count,
+            sum_latency,
+            sum_packet_loss,
+            sum_throughput,
+        ) = accumulator
+
+        payload = event["payload"]
+
+        return (
+            count + 1,
+            sum_latency + float(payload["latency_ms"]),
+            sum_packet_loss
+            + float(payload["packet_loss_pct"]),
+            sum_throughput
+            + float(payload["throughput_mbps"]),
+        )
+
+    def merge_accumulators(self, accumulators):
+        count = 0
+        sum_latency = 0.0
+        sum_packet_loss = 0.0
+        sum_throughput = 0.0
+
+        for accumulator in accumulators:
+            (
+                partial_count,
+                partial_latency,
+                partial_packet_loss,
+                partial_throughput,
+            ) = accumulator
+
+            count += partial_count
+            sum_latency += partial_latency
+            sum_packet_loss += partial_packet_loss
+            sum_throughput += partial_throughput
+
+        return (
+            count,
+            sum_latency,
+            sum_packet_loss,
+            sum_throughput,
+        )
+
+    def extract_output(self, accumulator):
+        (
+            count,
+            sum_latency,
+            sum_packet_loss,
+            sum_throughput,
+        ) = accumulator
+
+        if count == 0:
+            return {
+                "sample_count": 0,
+                "avg_latency_ms": 0.0,
+                "avg_packet_loss_pct": 0.0,
+                "avg_throughput_mbps": 0.0,
+            }
+
+        return {
+            "sample_count": count,
+            "avg_latency_ms": round(
+                sum_latency / count,
+                2,
+            ),
+            "avg_packet_loss_pct": round(
+                sum_packet_loss / count,
+                2,
+            ),
+            "avg_throughput_mbps": round(
+                sum_throughput / count,
+                2,
+            ),
+        }
+
+
+def key_by_node_id(event):
+    """Usar node_id como clave para la agregación."""
+
+    return event["payload"]["node_id"], event
+
+
+def aggregate_quality_by_node(events):
+    """Agregar métricas de calidad por nodo y ventana."""
+
+    return (
+        events
+        | "KeyByNodeId"
+        >> beam.Map(key_by_node_id)
+        | "CombineQualityByNode"
+        >> beam.CombinePerKey(NetworkQualityCombineFn())
+    )
+
+
+class FormatQualityAggregateDoFn(beam.DoFn):
+    """Convertir el agregado en un registro de salida."""
+
+    def process(
+        self,
+        element,
+        window_param=beam.DoFn.WindowParam,
+    ):
+        node_id, metrics = element
+
+        yield {
+            "schema_version": 1,
+            "metric_type": "network_quality",
+            "node_id": node_id,
+            "window_start": (
+                window_param.start
+                .to_utc_datetime(has_tz=True)
+                .isoformat()
+            ),
+            "window_end": (
+                window_param.end
+                .to_utc_datetime(has_tz=True)
+                .isoformat()
+            ),
+            **metrics,
+        }
+
+
