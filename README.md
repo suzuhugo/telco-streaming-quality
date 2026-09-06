@@ -434,6 +434,64 @@ K → LATE
 debe interpretarse como dos revisiones de una misma entidad lógica y no
 como dos agregados que deban sumarse.
 
+## Consumidor y vista materializada
+
+El proyecto incluye un consumidor Python para `telco.quality.v1`.
+
+El consumidor mantiene una vista en memoria utilizando:
+
+```text
+current_view[key] = aggregate
+```
+
+La clave lógica es:
+
+```text
+metric_type|node_id|window_start
+```
+
+Por tanto, una revisión posterior reemplaza el estado anterior de la
+misma entidad.
+
+Ejemplo:
+
+```text
+K → ON_TIME
+K → LATE
+```
+
+produce finalmente:
+
+```text
+K → LATE
+```
+
+y no dos entidades independientes.
+
+### Ejecutar el consumidor
+
+```bash
+uv run python -m app.consumer \
+  --group-id telco-quality-view-v1 \
+  --offset-reset latest
+```
+
+### Reconstruir la vista desde Kafka
+
+Utilizar un consumer group nuevo:
+
+```bash
+uv run python -m app.consumer \
+  --group-id telco-quality-replay-1 \
+  --offset-reset earliest
+```
+
+La vista es deliberadamente en memoria. Si el proceso termina, puede
+reconstruirse reproduciendo el changelog almacenado en Kafka.
+
+No se implementa una base de datos externa para mantener el alcance del
+proyecto simple y reproducible.
+
 
 ## Estado
 
