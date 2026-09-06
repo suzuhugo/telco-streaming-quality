@@ -293,6 +293,49 @@ con el mismo `event_id` no incrementa `sample_count` ni modifica los
 promedios.
 
 
+## Triggers, lateness y panes
+
+La política de agregación utiliza:
+
+- ventana fija de 60 segundos;
+- `AfterWatermark` para el pane ON_TIME;
+- `AfterCount(1)` para cada revisión LATE;
+- `allowed_lateness = 30` segundos;
+- modo `ACCUMULATING`;
+- no se utilizan panes EARLY.
+
+El pane ON_TIME se emite cuando el watermark supera el final de la
+ventana.
+
+Si posteriormente llega un evento cuyo `event_time` pertenece a esa
+ventana y todavía se encuentra dentro del margen de 30 segundos, se emite
+un pane LATE.
+
+En modo ACCUMULATING, el pane tardío representa el resultado completo
+revisado y no solamente la contribución del evento nuevo.
+
+Ejemplo:
+
+```text
+ON_TIME
+sample_count = 2
+avg_latency_ms = 30
+
+LATE
+sample_count = 3
+avg_latency_ms = 40
+```
+
+Los panes de una misma combinación `node_id + ventana` deben interpretarse
+como revisiones del mismo resultado lógico.
+
+### Límite de la implementación
+
+La deduplicación utiliza agrupación por `event_id` dentro de ventanas para
+mantener una solución simple. No se afirma una garantía stateful global
+para el caso combinado de un duplicado que reaparece en revisiones tardías.
+
+Tampoco se afirma exactamente-once end-to-end.
 
 
 

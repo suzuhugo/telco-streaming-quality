@@ -16,11 +16,10 @@ from app.transforms import (
     FormatQualityAggregateDoFn,
     ParseAndValidateDoFn,
     aggregate_quality_by_node,
+    aggregation_window_policy,
     deduplicate_by_event_id,
     fixed_window_policy,
-    aggregation_window_policy,
 )
-
 
 DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092"
 DEFAULT_INPUT_TOPIC = "telco.telemetry.v1"

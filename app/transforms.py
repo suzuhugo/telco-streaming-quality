@@ -3,10 +3,9 @@ from typing import Any
 import apache_beam as beam
 from apache_beam import pvalue
 from apache_beam.transforms import trigger, window
+from apache_beam.utils.windowed_value import PaneInfoTiming
 
 from app.contracts import deserialize_event, parse_utc
-
-from apache_beam.utils.windowed_value import PaneInfoTiming
 
 INVALID_TAG = "invalid"
 

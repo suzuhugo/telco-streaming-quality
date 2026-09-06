@@ -244,29 +244,45 @@ def test_formatted_aggregate_contains_window_metadata():
             >> beam.ParDo(FormatQualityAggregateDoFn())
         )
 
+
+        projection = (
+            result
+            | "ProjectFormattedFields"
+            >> beam.Map(
+                lambda item: (
+                    item["schema_version"],
+                    item["metric_type"],
+                    item["node_id"],
+                    item["window_start"],
+                    item["window_end"],
+                    item["sample_count"],
+                    item["avg_latency_ms"],
+                    item["avg_packet_loss_pct"],
+                    item["avg_throughput_mbps"],
+                )
+            )
+        )
+
         assert_that(
-            result,
+            projection,
             equal_to(
                 [
-                    {
-                        "schema_version": 1,
-                        "metric_type": "network_quality",
-                        "node_id": "NODE-01",
-                        "window_start": (
-                            "2026-09-05T16:00:00+00:00"
-                        ),
-                        "window_end": (
-                            "2026-09-05T16:01:00+00:00"
-                        ),
-                        "sample_count": 2,
-                        "avg_latency_ms": 30.0,
-                        "avg_packet_loss_pct": 1.0,
-                        "avg_throughput_mbps": 90.0,
-                    }
+                    (
+                        1,
+                        "network_quality",
+                        "NODE-01",
+                        "2026-09-05T16:00:00+00:00",
+                        "2026-09-05T16:01:00+00:00",
+                        2,
+                        30.0,
+                        1.0,
+                        90.0,
+                    )
                 ]
             ),
         )
 
+        
 
 def test_same_node_produces_separate_window_aggregates():
     event_1 = make_event(

@@ -1,8 +1,4 @@
 import apache_beam as beam
-from apache_beam.transforms import trigger
-
-from app.transforms import aggregation_window_policy
-
 from apache_beam.options.pipeline_options import (
     PipelineOptions,
     StandardOptions,
@@ -14,13 +10,16 @@ from apache_beam.testing.test_stream import (
     TestStream as BeamTestStream,
 )
 from apache_beam.testing.util import assert_that, equal_to
+from apache_beam.transforms import trigger
 from apache_beam.transforms.window import TimestampedValue
 
 from app.contracts import parse_utc
 from app.transforms import (
     FormatQualityAggregateDoFn,
     aggregate_quality_by_node,
+    aggregation_window_policy,
 )
+
 
 def test_aggregation_trigger_policy():
     policy = aggregation_window_policy(
