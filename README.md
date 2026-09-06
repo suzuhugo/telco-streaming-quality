@@ -387,6 +387,53 @@ la misma entidad mediante semántica UPSERT.
 No se afirma una garantía exactly-once end-to-end.
 
 
+## Salida Kafka
+
+Los agregados procesados por Beam se publican en:
+
+`telco.quality.v1`
+
+El pipeline convierte cada agregado en un registro Kafka:
+
+```text
+key   = metric_type|node_id|window_start
+value = agregado JSON completo
+```
+
+Ejemplo de clave:
+
+```text
+network_quality|NODE-01|2026-09-06T10:00:00+00:00
+```
+
+La clave es estable entre panes ON_TIME y LATE de la misma entidad lógica.
+
+### Observar la salida
+
+```bash
+MSYS_NO_PATHCONV=1 docker exec -it telco-kafka \
+  /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server broker:19092 \
+  --topic telco.quality.v1 \
+  --property print.key=true \
+  --property print.value=true
+```
+
+### Semántica
+
+Kafka conserva las revisiones como registros del log. La clave estable
+permite que un consumidor materialice la última revisión mediante UPSERT.
+
+Por ejemplo:
+
+```text
+K → ON_TIME
+K → LATE
+```
+
+debe interpretarse como dos revisiones de una misma entidad lógica y no
+como dos agregados que deban sumarse.
+
 
 ## Estado
 

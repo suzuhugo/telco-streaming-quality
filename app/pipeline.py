@@ -3,13 +3,14 @@ import logging
 from typing import Any
 
 import apache_beam as beam
-from apache_beam.io.kafka import ReadFromKafka
+from apache_beam.io.kafka import ReadFromKafka, WriteToKafka
 from apache_beam.options.pipeline_options import (
     PipelineOptions,
     PortableOptions,
     StandardOptions,
 )
 
+from app.output import to_kafka_record
 from app.transforms import (
     INVALID_TAG,
     AssignEventTimestampDoFn,
@@ -24,6 +25,7 @@ from app.transforms import (
 DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092"
 DEFAULT_INPUT_TOPIC = "telco.telemetry.v1"
 DEFAULT_GROUP_ID = "telco-quality-pipeline-v1"
+DEFAULT_OUTPUT_TOPIC = "telco.quality.v1"
 
 LOGGER = logging.getLogger(__name__)
 
@@ -60,6 +62,7 @@ def build_pipeline(
     *,
     bootstrap_servers: str,
     input_topic: str,
+    output_topic: str,
     group_id: str,
     offset_reset: str,
 ):
@@ -132,6 +135,26 @@ def build_pipeline(
         >> beam.Map(log_quality_aggregate)
     )
 
+
+    kafka_ready_quality = (
+        formatted_quality
+        | "BuildKafkaOutputRecord"
+        >> beam.Map(to_kafka_record)
+    )
+
+    _ = (
+        kafka_ready_quality
+        | "WriteQualityToKafka"
+        >> WriteToKafka(
+            producer_config={
+                "bootstrap.servers": bootstrap_servers,
+                "acks": "all",
+                "enable.idempotence": "true",
+            },
+            topic=output_topic,
+        )
+    )
+
     _ = (
         outputs.invalid
         | "LogInvalidEvents"
@@ -168,6 +191,11 @@ def parse_args():
         "--offset-reset",
         choices=("latest", "earliest"),
         default="latest",
+    )
+
+    parser.add_argument(
+        "--output-topic",
+        default=DEFAULT_OUTPUT_TOPIC,
     )
 
     return parser.parse_known_args()
@@ -240,14 +268,20 @@ def main() -> None:
         pipeline,
         bootstrap_servers=args.bootstrap_servers,
         input_topic=args.input_topic,
+        output_topic=args.output_topic,
         group_id=args.group_id,
         offset_reset=args.offset_reset,
     )
 
+    
     LOGGER.info(
-        "Starting pipeline topic=%s "
-        "bootstrap=%s group=%s",
+        "Starting pipeline "
+        "input=%s "
+        "output=%s "
+        "bootstrap=%s "
+        "group=%s",
         args.input_topic,
+        args.output_topic,
         args.bootstrap_servers,
         args.group_id,
     )
