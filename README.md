@@ -2,18 +2,28 @@
 
 Proyecto integrador de la asignatura Streaming de datos y sus aplicaciones.
 
-## Objetivo
+## OBJETIVO
 
 Implementar un pipeline end-to-end que genere telemetría sintética de red,
 publique eventos en Apache Kafka, procese métricas mediante Apache Beam
 utilizando tiempo de evento y ventanas, y publique resultados agregados
 consumibles.
 
-## Arquitectura
+## Caso de uso
+
+El proyecto implementa un pipeline de streaming para monitorear en tiempo
+real la calidad de una red de telecomunicaciones a partir de telemetría
+generada por nodos de red.
+
+El sistema procesa latencia, pérdida de paquetes y throughput, y genera
+agregados temporales por nodo para facilitar la observación del estado
+reciente de la red.
+
+## ARQUITECTURA
 
 Productor sintético → Kafka → Apache Beam → Kafka → Consumidor
 
-## Infraestructura Kafka
+## INFRAESTRUCTURA KAFKA
 
 El proyecto utiliza Apache Kafka 4.3.1 ejecutado localmente mediante
 Docker Compose en modo KRaft con un único nodo.
@@ -23,8 +33,17 @@ Docker Compose en modo KRaft con un único nodo.
 ```bash
 docker compose up -d
 ```
+### Decisiones Kafka
 
-## Contrato de eventos
+Se utiliza node_id como clave de particionamiento para preservar localidad y 
+orden relativo de los eventos de un mismo nodo dentro de una partición. Se 
+utiliza dos particiones, suficientes para demostrar paralelismo sin 
+sobredimensionar la infraestructura. Dado que el conjunto sintético 
+contiene solo tres nodos, no se realizó una evaluación estadística de skew 
+a gran escala; una distribución muy desigual de tráfico por nodo podría 
+concentrar carga en determinadas particiones.
+
+## CONTRATO DE EVENTOS
 
 Los eventos de telemetría utilizan JSON y actualmente corresponden a
 `schema_version = 1`.
@@ -65,7 +84,7 @@ Ejemplo:
 - `key` debe coincidir con `payload.node_id`.
 
 
-## Productor sintético
+## PRODUCTOR SINTÉTICO
 
 El productor genera telemetría reproducible para tres nodos:
 
@@ -112,7 +131,7 @@ Los duplicados deliberados conservan el mismo `event_id`. El desorden se
 simula alterando el orden de publicación sin modificar el `event_time`.
 
 
-## Pipeline Beam
+## PIPELINE BEAM
 
 El pipeline consume los eventos desde `telco.telemetry.v1` mediante
 Apache Beam KafkaIO.
@@ -160,7 +179,7 @@ En esta fase el campo `event_time` se valida, pero todavía no se utiliza
 como timestamp Beam. La asignación explícita de tiempo de evento se
 realiza en la siguiente etapa del pipeline.
 
-## Tiempo de evento y ventanas
+## TIEMPO DE EVENTO Y VENTANAS
 
 El pipeline utiliza `event_time` como timestamp lógico de cada medición.
 
@@ -196,7 +215,7 @@ El productor puede alterar el orden de publicación sin modificar
 `event_time`, permitiendo demostrar que eventos fuera de orden continúan
 asignándose a la ventana temporal correcta.
 
-### Lateness
+### LATENESS
 
 La política de ventana declara inicialmente:
 
@@ -207,7 +226,7 @@ La semántica completa de eventos tardíos, triggers y panes se demostrará
 junto con la agregación incremental.
 
 
-## Deduplicación
+## DEDUPLICACIÓN
 
 Los eventos se deduplican mediante `event_id` después de asignar
 `event_time` y la ventana temporal.
@@ -252,7 +271,7 @@ payloads diferentes con el mismo `event_id` se consideran una violación
 del contrato de origen.
 
 
-## Agregación de calidad de red
+## AGREGACIÓN DE CALIDAD DE RED
 
 Después de validar, asignar tiempo de evento, aplicar ventanas y eliminar
 duplicados, el pipeline agrega las mediciones por `node_id`.
@@ -338,7 +357,7 @@ para el caso combinado de un duplicado que reaparece en revisiones tardías.
 Tampoco se afirma exactamente-once end-to-end.
 
 
-## Contrato de salida e idempotencia
+## CONTRATO DE SALIDA E IDEMPOTENCIA 
 
 Cada agregado representa una entidad lógica identificada por:
 
@@ -434,7 +453,7 @@ K → LATE
 debe interpretarse como dos revisiones de una misma entidad lógica y no
 como dos agregados que deban sumarse.
 
-## Consumidor y vista materializada
+## CONSUMIDOR Y VISTA MATERIALIZADA
 
 El proyecto incluye un consumidor Python para `telco.quality.v1`.
 
@@ -492,7 +511,22 @@ reconstruirse reproduciendo el changelog almacenado en Kafka.
 No se implementa una base de datos externa para mantener el alcance del
 proyecto simple y reproducible.
 
+### ARQUITECTURA FINAL
 
-## Estado
-
-Proyecto en desarrollo.
+Synthetic Producer
+       ↓
+telco.telemetry.v1
+       ↓
+Apache Beam / PrismRunner
+       ├── validación
+       ├── event time
+       ├── ventanas
+       ├── deduplicación
+       ├── triggers
+       └── CombinePerKey
+       ↓
+telco.quality.v1
+       ↓
+Python Consumer
+       ↓
+Materialized View

@@ -16,6 +16,6 @@ implementación del proyecto integrador de streaming.
 
 - `01_pytest_ruff_passed.png`: suite completa de pruebas y análisis estático sin errores.
 - `02_kafka_topics.png`: configuración de los topics.
-- `03_producer_duplicates.png`: generación controlada de duplicados.
+- `03_producer_duplicate.png`: generación controlada de duplicados.
 - `04_materialized_view.png`: vista materializada del consumidor.
 - `05_upsert.png`: demostración INSERT/UPDATE con la misma clave lógica.
