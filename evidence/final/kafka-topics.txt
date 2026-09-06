@@ -1,0 +1,6 @@
+Topic: telco.telemetry.v1	TopicId: _HQYyBJ4QSyWyWkE13e7GQ	PartitionCount: 2	ReplicationFactor: 1	Configs: min.insync.replicas=1
+	Topic: telco.telemetry.v1	Partition: 0	Leader: 1	Replicas: 1	Isr: 1	Elr: 	LastKnownElr: 
+	Topic: telco.telemetry.v1	Partition: 1	Leader: 1	Replicas: 1	Isr: 1	Elr: 	LastKnownElr: 
+Topic: telco.quality.v1	TopicId: L1ZZ4OCgQXC9tvQjXxLrWQ	PartitionCount: 2	ReplicationFactor: 1	Configs: min.insync.replicas=1
+	Topic: telco.quality.v1	Partition: 0	Leader: 1	Replicas: 1	Isr: 1	Elr: 	LastKnownElr: 
+	Topic: telco.quality.v1	Partition: 1	Leader: 1	Replicas: 1	Isr: 1	Elr: 	LastKnownElr: 
