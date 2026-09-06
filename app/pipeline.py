@@ -125,6 +125,7 @@ def build_pipeline(
         >> beam.ParDo(FormatQualityAggregateDoFn())
     )
 
+    
     _ = (
         formatted_quality
         | "LogQualityAggregates"

@@ -338,6 +338,55 @@ para el caso combinado de un duplicado que reaparece en revisiones tardías.
 Tampoco se afirma exactamente-once end-to-end.
 
 
+## Contrato de salida e idempotencia
+
+Cada agregado representa una entidad lógica identificada por:
+
+```text
+metric_type | node_id | window_start
+```
+
+Ejemplo:
+
+```text
+network_quality|NODE-01|2026-09-06T10:00:00+00:00
+```
+
+La clave no incluye `pane_index` ni `pane_timing`, porque los panes
+ON_TIME y LATE son revisiones de la misma entidad lógica.
+
+### Revisiones acumulativas
+
+Ejemplo:
+
+```text
+ON_TIME
+key = network_quality|NODE-01|10:00
+sample_count = 2
+
+LATE
+key = network_quality|NODE-01|10:00
+sample_count = 3
+```
+
+El consumidor debe materializar:
+
+```text
+store[key] = aggregate
+```
+
+por lo que la revisión LATE reemplaza al resultado ON_TIME.
+
+No se deben sumar nuevamente los panes acumulativos.
+
+### Reintentos
+
+Un retry utiliza la misma clave lógica y, por tanto, puede converger sobre
+la misma entidad mediante semántica UPSERT.
+
+No se afirma una garantía exactly-once end-to-end.
+
+
 
 ## Estado
 
